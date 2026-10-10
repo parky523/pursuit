@@ -1,0 +1,32 @@
+{
+  "_comment": "Copy this file to config.json (setup.ps1 does it for you) and edit. Paths may be absolute (use forward slashes) or relative to the Pursuit folder.",
+
+  "tracker": "Job_Search_Tracker.xlsx",
+  "applications_dir": "Applications",
+
+  "weekly_target": 5,
+  "follow_up_days": 14,
+
+  "_deadline_help": "Optional countdown tile on the Coach tab (visa end, contract end, savings runway...). Set to null to show 'Drafts waiting' instead.",
+  "deadline": {"label": "Visa runway", "date": "2027-12-31", "note": "check date"},
+
+  "_sheets_help": "Sheet names inside the tracker workbook. Only 'log' is required; the others are optional and skipped if missing.",
+  "sheets": {
+    "log": "Daily Log",
+    "targets": "Target Companies",
+    "connections": "Connections",
+    "content": "Content Calendar"
+  },
+
+  "_daily_items_help": "Your default daily routine. Only used the very first time (and for 'Restore default items'); after that you edit the list inside the app.",
+  "daily_items": [
+    "Pick 1 target company from the Target Companies sheet",
+    "Research the company + find 1-2 LinkedIn contacts",
+    "Tailor CV + cover letter",
+    "Submit the 1 application",
+    "Log it in the Daily Log (same day)",
+    "Send 1-2 LinkedIn connection requests",
+    "LinkedIn 15 min: 3-5 comments",
+    "Language practice 30 min"
+  ]
+}

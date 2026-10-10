@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Pursuit</title>
+<meta name="theme-color" content="#0b0b0c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pursuit">
+<link rel="manifest" href="/manifest.webmanifest?k={{TOKEN}}">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/favicon.png">
+<style>
+@font-face { font-family: "Unbounded"; src: url(/fonts/unbounded-700.ttf); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Unbounded"; src: url(/fonts/unbounded-500.ttf); font-weight: 500; font-display: swap; }
+@font-face { font-family: "JB"; src: url(/fonts/jetbrains-mono-500.ttf); font-weight: 500; font-display: swap; }
+@font-face { font-family: "JB"; src: url(/fonts/jetbrains-mono-700.ttf); font-weight: 700; font-display: swap; }
+@font-face { font-family: "IS"; src: url(/fonts/instrument-sans-400.ttf); font-weight: 400; font-display: swap; }
+@font-face { font-family: "IS"; src: url(/fonts/instrument-sans-600.ttf); font-weight: 600; font-display: swap; }
+:root {
+  --bg: #0b0b0c; --card: #151517; --line: #2a2a2e; --fg: #f2efe6; --muted: #8c8a83; --dim: #55534e;
+  --lime: #c8ff3d; --orange: #ff9f1c; --red: #ff5a4e; --sky: #7cc7ff;
+  --top: env(safe-area-inset-top); --bot: env(safe-area-inset-bottom);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); }
+body { font: 400 15px/1.4 "IS", system-ui, sans-serif; overscroll-behavior-y: contain; }
+.mono { font-family: "JB", ui-monospace, monospace; letter-spacing: .02em; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+
+header { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: calc(var(--top) + 14px) 16px 10px;
+  display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); }
+header img { width: 28px; height: 28px; border-radius: 7px; }
+header .word { font: 700 17px "Unbounded", sans-serif; letter-spacing: .01em; }
+header .meta { margin-left: auto; font-size: 10px; color: var(--muted); text-align: right; }
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--lime); margin-right: 6px; }
+.dot.busy { background: var(--orange); animation: pulse 1s infinite; } .dot.off { background: var(--red); }
+@keyframes pulse { 50% { opacity: .3; } }
+.bar { height: 3px; background: var(--line); }
+.bar i { display: block; height: 3px; background: var(--lime); width: 0; transition: width .4s; }
+
+main { padding: 0 16px calc(var(--bot) + 150px); }
+.banner { margin: 12px 0 0; padding: 10px 12px; font-size: 11px; border: 1px solid var(--line); background: var(--card); }
+.banner.off { border-color: var(--red); color: var(--red); }
+
+.sec { display: flex; align-items: center; gap: 10px; margin: 22px 0 8px; font: 700 11px "JB", monospace;
+  letter-spacing: .06em; }
+.sec::after { content: ""; flex: 1; height: 1px; background: var(--line); order: 1; }
+.sec .n { order: 2; }
+
+/* today */
+.hero-date { margin-top: 18px; }
+.hero-date .wd { font: 700 11px "JB", monospace; color: var(--muted); letter-spacing: .08em; }
+.hero-date .row { display: flex; justify-content: space-between; align-items: baseline; }
+.hero-date .big { font: 700 34px/1.1 "Unbounded", sans-serif; }
+.hero-date .pct { font: 500 34px/1.1 "Unbounded", sans-serif; }
+.check { display: flex; gap: 12px; align-items: flex-start; padding: 9px 0; }
+.box { flex: none; width: 22px; height: 22px; border: 2px solid var(--dim); margin-top: 1px; display: grid; place-items: center; }
+.check.done .box { background: var(--lime); border-color: var(--lime); }
+.check.done .box::after { content: ""; width: 10px; height: 5px; border: solid var(--bg); border-width: 0 0 3px 3px;
+  transform: translate(0, -2px) rotate(-45deg); }
+.check .t { flex: 1; }
+.check.done .t { color: var(--dim); text-decoration: line-through; }
+.check .del { font: 700 10px "JB", monospace; color: var(--dim); padding: 4px 2px 4px 10px; }
+.adder { position: fixed; left: 0; right: 0; bottom: calc(var(--bot) + 64px); padding: 10px 16px; background: var(--bg);
+  border-top: 1px solid var(--line); display: flex; z-index: 4; }
+.adder input { flex: 1; min-width: 0; background: var(--card); border: 1px solid var(--line); border-right: 0; color: var(--fg);
+  font: 400 16px "IS", sans-serif; padding: 12px; outline: none; border-radius: 0; }
+.adder input:focus { border-color: var(--lime); }
+.adder button { background: var(--lime); color: var(--bg); font: 700 12px "JB", monospace; padding: 0 16px; }
+
+/* coach */
+.slab { background: var(--lime); color: var(--bg); padding: 16px; margin-top: 16px; }
+.slab .top { display: flex; align-items: flex-end; gap: 8px; }
+.slab .lbl { font: 700 11px "JB", monospace; padding-bottom: 9px; }
+.slab .num { font: 700 52px/1 "Unbounded", sans-serif; }
+.slab .wk { margin-left: auto; text-align: right; font: 700 12px "JB", monospace; }
+.slab p { margin: 10px 0 0; font: 600 17px/1.35 "IS", sans-serif; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); margin-top: 12px; }
+.tile { background: var(--card); padding: 12px; }
+.tile .l { font: 500 10px "JB", monospace; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.tile .v { font: 700 26px/1.2 "Unbounded", sans-serif; margin-top: 4px; }
+.tile .s { font-size: 11px; color: var(--dim); }
+.move { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; }
+.move .i { font: 700 12px "JB", monospace; color: var(--lime); padding-top: 2px; }
+.move .t { flex: 1; }
+.move.added .t { color: var(--dim); }
+
+/* pipeline */
+.counts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); margin-top: 16px; }
+.counts div { background: var(--card); padding: 10px 8px; }
+.counts b { display: block; font: 700 22px "Unbounded", sans-serif; }
+.counts span { font: 500 9px "JB", monospace; color: var(--muted); }
+.card { border: 1px solid var(--line); background: var(--card); margin: 8px 0; display: flex; }
+.card .stripe { width: 3px; flex: none; }
+.card .in { flex: 1; padding: 12px 12px 12px 14px; min-width: 0; }
+.card .h { display: flex; gap: 8px; align-items: flex-start; }
+.card .co { flex: 1; font: 600 16px/1.25 "IS", sans-serif; }
+.tag { font: 700 9px "JB", monospace; color: var(--bg); padding: 2px 5px; flex: none; margin-top: 2px; }
+.card .role { color: var(--muted); font-size: 13px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .m { font: 500 10px "JB", monospace; text-transform: uppercase; margin-top: 7px; }
+.acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.btn { font: 700 11px "JB", monospace; border: 1px solid var(--line); color: var(--lime); padding: 8px 10px; }
+.btn.fill { background: var(--lime); color: var(--bg); border-color: var(--lime); }
+.btn.red { color: var(--red); } .btn.mut { color: var(--muted); }
+.btn.right { margin-left: auto; }
+.btn:active { transform: scale(.96); }
+.target { display: flex; gap: 12px; padding: 4px 0; }
+.target b { font: 700 11px "JB", monospace; color: var(--lime); width: 22px; }
+.toggle-closed { width: 100%; text-align: left; }
+
+/* bottom nav */
+nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: repeat(3, 1fr);
+  background: var(--bg); border-top: 1px solid var(--line); padding-bottom: var(--bot); }
+nav button { position: relative; height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  font: 700 10px "JB", monospace; color: var(--muted); letter-spacing: .06em; }
+nav button svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; }
+nav button.on { color: var(--lime); }
+nav button.on::before { content: ""; position: absolute; top: -1px; width: 34px; height: 3px; background: var(--lime); }
+
+/* sheet */
+.sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 9; display: none; }
+.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--card); border-top: 2px solid var(--lime);
+  padding: 16px 16px calc(var(--bot) + 16px); transform: translateY(105%); transition: transform .2s; }
+.sheet.open { transform: none; } .sheet-bg.open { display: block; }
+.sheet h3 { margin: 0 0 4px; font: 600 17px "IS", sans-serif; }
+.sheet .opt { display: block; width: 100%; text-align: left; padding: 13px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+.sheet .opt.cur { color: var(--lime); }
+.toast { position: fixed; left: 16px; right: 16px; bottom: calc(var(--bot) + 140px); z-index: 11; background: var(--lime); color: var(--bg);
+  font: 700 12px "JB", monospace; padding: 12px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.show { opacity: 1; } .toast.err { background: var(--red); }
+.empty { color: var(--dim); padding: 30px 0; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <img src="/icon-192.png" alt="">
+  <div class="word">PURSUIT</div>
+  <div class="meta mono" id="meta"><span class="dot" id="dot"></span><span id="metatext">…</span></div>
+</header>
+<div class="bar"><i id="bar"></i></div>
+<main id="main"><div class="empty mono">LOADING…</div></main>
+<div class="adder" id="adder"><input id="newtask" placeholder="Add a task" enterkeyhint="done"><button id="addbtn">ADD</button></div>
+<nav>
+  <button data-tab="today"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18"/><path d="M7.5 12.5l3 3 6-7"/></svg>TODAY</button>
+  <button data-tab="coach"><svg viewBox="0 0 24 24"><circle cx="11" cy="13" r="8"/><circle cx="11" cy="13" r="3.5"/><path d="M13.5 10.5L21 3M16 3h5v5"/></svg>COACH</button>
+  <button data-tab="apps"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h12"/></svg>PIPELINE</button>
+</nav>
+<div class="sheet-bg" id="sheetbg"></div>
+<div class="sheet" id="sheet"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY = "{{TOKEN}}";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let S = null, tab = "today", offline = false, showClosed = false, pollTimer = null;
+try { tab = localStorage.getItem("pursuit.tab") || "today"; } catch (e) {}
+if (["#today", "#coach", "#apps"].includes(location.hash)) tab = location.hash.slice(1);
+
+async function api(path, body) {
+  const r = await fetch(path, { method: body ? "POST" : "GET", cache: "no-store",
+    headers: { "X-Key": KEY, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.status);
+  return j;
+}
+function save() { try { localStorage.setItem("pursuit.state", JSON.stringify({ at: Date.now(), S })); } catch (e) {} }
+function cached() { try { return JSON.parse(localStorage.getItem("pursuit.state")); } catch (e) { return null; } }
+
+async function load() {
+  try { S = await api("/api/state"); offline = false; save(); }
+  catch (e) { offline = true; const c = cached(); if (c && !S) { S = c.S; S._at = c.at; } }
+  render(); schedule();
+}
+function schedule() { clearTimeout(pollTimer); pollTimer = setTimeout(load, S && S.busy ? 1500 : 20000); }
+async function act(body, okMsg) {
+  if (offline) return toast("PC offline - can't save right now", true);
+  try { S = await api("/api/do", body); save(); render(); if (okMsg) toast(okMsg); schedule(); }
+  catch (e) { toast(String(e.message || e), true); load(); }
+}
+function toast(msg, err) {
+  const t = $("#toast"); t.textContent = msg.toUpperCase(); t.className = "toast show" + (err ? " err" : "");
+  clearTimeout(t._h); t._h = setTimeout(() => t.className = "toast", 2400);
+  if (navigator.vibrate) navigator.vibrate(err ? [30, 40, 30] : 12);
+}
+
+function render() {
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
+  $("#adder").style.display = tab === "today" ? "flex" : "none";
+  const dot = $("#dot");
+  dot.className = "dot" + (offline ? " off" : S && S.busy ? " busy" : "");
+  if (!S) { $("#main").innerHTML = '<div class="banner off mono">CAN\'T REACH PURSUIT ON YOUR PC.<br>Is the PC on and Pursuit running?</div>'; $("#metatext").textContent = "OFFLINE"; return; }
+  $("#metatext").textContent = offline ? "OFFLINE" : S.busy ? "SAVING…" : "SYNCED " + (S.synced || "");
+  let h = "";
+  if (offline) h += `<div class="banner off mono">PC OFFLINE · SHOWING LAST VIEW${S._at ? " FROM " + new Date(S._at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : ""}</div>`;
+  else if (S.msg) h += `<div class="banner mono">${esc(S.msg.toUpperCase())}</div>`;
+  h += tab === "today" ? today() : tab === "coach" ? coach() : pipeline();
+  $("#main").innerHTML = h;
+}
+
+function check(it, kind) {
+  return `<div class="check${it.done ? " done" : ""}" data-k="${kind}" data-t="${esc(it.text)}">
+    <div class="box"></div><div class="t">${esc(it.text)}</div>${kind === "toggle" ? '<button class="del" data-del="1">DEL</button>' : ""}</div>`;
+}
+function today() {
+  const T = S.today, all = T.auto.concat(T.items), done = all.filter(x => x.done).length;
+  const pct = all.length ? Math.round(100 * done / all.length) : 0;
+  $("#bar").style.width = pct + "%";
+  let h = `<div class="hero-date"><div class="wd">${esc(S.weekday.toUpperCase())}</div>
+    <div class="row"><div class="big">${esc(S.day_month)}</div><div class="pct" style="color:${pct === 100 ? "var(--lime)" : "var(--fg)"}">${pct}%</div></div></div>`;
+  if (T.auto.length) h += sec("FROM YOUR PIPELINE", "var(--lime)", T.auto.length) + T.auto.map(x => check(x, "toggle_auto")).join("");
+  h += sec("DAILY ROUTINE", "var(--muted)", T.items.length) + T.items.map(x => check(x, "toggle")).join("");
+  return h;
+}
+function sec(title, color, n) {
+  return `<div class="sec" style="color:${color}"><span>${esc(title)}</span>${n != null ? `<span class="n">${String(n).padStart(2, "0")}</span>` : ""}</div>`;
+}
+function tile(l, v, s, c) { return `<div class="tile"><div class="l">${l}</div><div class="v" style="color:${c || "var(--fg)"}">${v}</div><div class="s">${s}</div></div>`; }
+function coach() {
+  const c = S.coach; $("#bar").style.width = Math.min(100, 100 * c.this / c.target) + "%";
+  const trend = c.this > c.last ? "▲" : c.this < c.last ? "▼" : "=";
+  let h = `<div class="slab"><div class="top"><span class="lbl">DAY</span><span class="num">${c.day}</span>
+    <span class="wk">WEEK<br>${c.this}/${c.target}</span></div><p>${esc(c.motivation)}</p></div><div class="grid">`;
+  h += tile("Sent this week", `${c.this}/${c.target}`, `last week ${c.last} ${trend}`, c.this >= c.target ? "var(--lime)" : "");
+  h += tile("Week closes in", `${c.left_d}d ${String(c.left_h).padStart(2, "0")}h`, "Sunday 24:00", c.left_d < 2 && c.this < c.target ? "var(--orange)" : "");
+  h += tile("Since last sent", c.since == null ? "-" : c.since + "d", c.last_sent || "none yet", c.since >= 4 ? "var(--red)" : "");
+  h += tile("Routine streak", c.streak + "d", "days at 60%+ checklist", "var(--lime)");
+  h += tile("Applications out", c.sent, `${c.answered} answered · ${c.due} follow-ups due`);
+  h += tile(esc(c.extra_tile.label), esc(c.extra_tile.value), esc(c.extra_tile.sub), "var(--muted)");
+  h += "</div>" + sec("NEXT MOVES", "var(--lime)", S.moves.length);
+  h += S.moves.map((m, i) => `<div class="move${m.added ? " added" : ""}"><span class="i">${String(i + 1).padStart(2, "0")}</span>
+    <span class="t">${esc(m.text)}</span>${m.added ? '<span class="btn mut">✓ ON LIST</span>' : `<button class="btn fill" data-suggest="${esc(m.text)}">+ TODAY</button>`}</div>`).join("");
+  return h;
+}
+function card(a, gi, ci) {
+  const acts = a.actions.map((x, i) => `<button class="btn${x.filled ? " fill" : ""}" data-a="${gi}.${ci}.${i}">${esc(x.label)}</button>`).join("");
+  return `<div class="card"><div class="stripe" style="background:${a.color}"></div><div class="in">
+    <div class="h"><div class="co">${esc(a.company)}</div><span class="tag" style="background:${a.color}">${esc(a.status.replace(" - Not a Fit", "").toUpperCase())}</span></div>
+    <div class="role">${esc(a.role)}</div><div class="m" style="color:${a.meta_color}">${esc(a.meta)}</div>
+    <div class="acts">${acts}<button class="btn mut right" data-more="${gi}.${ci}">···</button><button class="btn red" data-rm="${gi}.${ci}">REMOVE</button></div></div></div>`;
+}
+function pipeline() {
+  const P = S.pipeline, c = P.counts, sent = S.coach.sent;
+  $("#bar").style.width = (sent ? 100 * S.coach.answered / sent : 0) + "%";
+  const col = { "Applied": "var(--sky)", "Interview": "var(--lime)", "Offer": "var(--lime)", "To send": "var(--orange)", "Rejected": "var(--red)" };
+  let h = '<div class="counts">' + Object.entries(c).map(([k, v]) =>
+    `<div><b style="color:${v ? col[k] : "var(--dim)"}">${v}</b><span>${k.toUpperCase()}</span></div>`).join("") + "</div>";
+  P.groups.forEach((g, gi) => {
+    if (!g.cards.length) return;
+    if (g.key === "closed") {
+      h += `<button class="toggle-closed" data-closed="1">${sec((showClosed ? "− " : "+ ") + "CLOSED", g.color, g.cards.length)}</button>`;
+      if (!showClosed) return;
+    } else h += sec(g.title, g.color, g.cards.length);
+    h += g.cards.map((a, ci) => card(a, gi, ci)).join("");
+  });
+  if (P.targets.total) {
+    h += sec(`TARGET BOOK · ${P.targets.untouched}/${P.targets.total} UNTOUCHED`, "var(--muted)");
+    h += P.targets.next.map(t => `<div class="target"><b>${esc(t.prio || "--")}</b><span>${esc(t.company)}</span></div>`).join("");
+  }
+  return h;
+}
+function cardAt(ref) { const [g, c] = ref.split(".").map(Number); return S.pipeline.groups[g].cards[c]; }
+function openSheet(a) {
+  const opts = S.pipeline.statuses.map(s => `<button class="opt${s === a.status ? " cur" : ""}" data-st="${esc(s)}">${s === a.status ? "● " : ""}${esc(s)}</button>`).join("");
+  $("#sheet").innerHTML = `<h3>${esc(a.company)}</h3><div class="mono" style="color:var(--muted);font-size:11px;margin-bottom:6px">SET STATUS · SAVES TO EXCEL</div>${opts}`;
+  $("#sheet")._a = a; $("#sheet").classList.add("open"); $("#sheetbg").classList.add("open");
+}
+function closeSheet() { $("#sheet").classList.remove("open"); $("#sheetbg").classList.remove("open"); }
+
+document.addEventListener("click", e => {
+  const el = e.target.closest("button, .check");
+  if (!el) return;
+  if (el.matches("nav button")) { tab = el.dataset.tab; try { localStorage.setItem("pursuit.tab", tab); } catch (x) {} window.scrollTo(0, 0); return render(); }
+  if (el.dataset.del) { const t = el.closest(".check").dataset.t; if (confirm("Delete this task?\n\n" + t)) act({ action: "delete", text: t }); return; }
+  if (el.classList.contains("check")) { el.classList.toggle("done"); return act({ action: el.dataset.k, text: el.dataset.t }); }
+  if (el.dataset.suggest) return act({ action: "suggest", text: el.dataset.suggest }, "Added to today");
+  if (el.dataset.closed) { showClosed = !showClosed; return render(); }
+  if (el.dataset.a) {
+    const [g, c, i] = el.dataset.a.split(".").map(Number), a = S.pipeline.groups[g].cards[c], x = a.actions[i];
+    return act({ action: x.kind, status: x.status, row: a.row, company: a.company }, x.kind === "followed" ? "Follow-up logged" : a.company + " → " + x.status);
+  }
+  if (el.dataset.more) return openSheet(cardAt(el.dataset.more));
+  if (el.dataset.rm) {
+    const a = cardAt(el.dataset.rm);
+    if (confirm(`Remove from the Daily Log?\n\n${a.company}\n${a.role}\n\nA backup copy is kept on the PC.`)) act({ action: "remove", row: a.row, company: a.company }, "Removed " + a.company);
+    return;
+  }
+  if (el.dataset.st) { const a = $("#sheet")._a; closeSheet(); return act({ action: "status", status: el.dataset.st, row: a.row, company: a.company }, a.company + " → " + el.dataset.st); }
+});
+$("#sheetbg").onclick = closeSheet;
+function addTask() { const i = $("#newtask"), v = i.value.trim(); if (!v) return i.focus(); i.value = ""; i.blur(); act({ action: "add", text: v }, "Task added"); }
+$("#addbtn").onclick = addTask;
+$("#newtask").addEventListener("keydown", e => { if (e.key === "Enter") addTask(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
+
+// pull down at the top to refresh
+let y0 = null;
+addEventListener("touchstart", e => { y0 = scrollY <= 0 ? e.touches[0].clientY : null; }, { passive: true });
+addEventListener("touchend", e => { if (y0 != null && e.changedTouches[0].clientY - y0 > 90) { toast("Syncing"); act({ action: "sync" }); } y0 = null; }, { passive: true });
+
+load();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+openpyxl>=3.1      # reads the tracker workbook
+pywin32>=306       # Excel COM - writes status changes back into the workbook
+qrcode>=7.4        # QR codes in the PHONE window
+pillow>=10.0       # QR rendering
+pyinstaller>=6.0   # only needed to build Pursuit.exe

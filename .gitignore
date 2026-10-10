@@ -1,0 +1,17 @@
+# personal data - never commit
+config.json
+checklist.json
+checklist.tmp
+removed_rows.json
+*.xlsx
+!Job_Search_Tracker_TEMPLATE.xlsx
+~$*.xlsx
+Applications/
+*QR*.png
+
+# build output (Pursuit.exe is attached to GitHub Releases instead)
+Pursuit.exe
+build/
+dist/
+*.spec
+__pycache__/
