@@ -192,10 +192,10 @@ function render() {
   $("#adder").style.display = tab === "today" ? "flex" : "none";
   const dot = $("#dot");
   dot.className = "dot" + (offline ? " off" : S && S.busy ? " busy" : "");
-  if (!S) { $("#main").innerHTML = '<div class="banner off mono">CAN\'T REACH PURSUIT ON YOUR PC.<br>Is the PC on and Pursuit running?</div>'; $("#metatext").textContent = "OFFLINE"; return; }
+  if (!S) { $("#main").innerHTML = '<div class="banner off mono">CAN\'T REACH PURSUIT ON YOUR PC.<br>Check: Tailscale switched ON on this phone · PC awake · Pursuit open on the PC</div>'; $("#metatext").textContent = "OFFLINE"; return; }
   $("#metatext").textContent = offline ? "OFFLINE" : S.busy ? "SAVING…" : "SYNCED " + (S.synced || "");
   let h = "";
-  if (offline) h += `<div class="banner off mono">PC OFFLINE · SHOWING LAST VIEW${S._at ? " FROM " + new Date(S._at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : ""}</div>`;
+  if (offline) h += `<div class="banner off mono">PC OFFLINE · SHOWING LAST VIEW${S._at ? " FROM " + new Date(S._at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : ""}<br><span style="color:var(--muted)">Check: Tailscale switched ON on this phone · PC awake · Pursuit open on the PC</span></div>`;
   else if (S.msg) h += `<div class="banner mono">${esc(S.msg.toUpperCase())}</div>`;
   h += tab === "today" ? today() : tab === "coach" ? coach() : pipeline();
   $("#main").innerHTML = h;
