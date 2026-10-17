@@ -89,6 +89,24 @@ def save_uploads(folder, files, label, note, log_dir, dest_label):
     return saved
 
 
+def move_upload(log_dir, item_id, folder, label):
+    """Move one logged upload into `folder` and rewrite its log line (used to sort shared items)."""
+    import shutil
+    from pathlib import Path
+    log = log_dir / "_uploads.jsonl"
+    lines = log.read_text(encoding="utf-8").splitlines()
+    d = json.loads(lines[item_id])
+    src = Path(d["path"])
+    folder.mkdir(parents=True, exist_ok=True)
+    dst = folder / src.name
+    if src.exists():
+        shutil.move(str(src), str(dst))
+    d.update(path=str(dst), dest=label)
+    lines[item_id] = json.dumps(d, ensure_ascii=False)
+    log.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return d
+
+
 def recent_uploads(log_dir, limit=30):
     try:
         lines = (log_dir / "_uploads.jsonl").read_text(encoding="utf-8").splitlines()
@@ -208,6 +226,16 @@ class PhoneServer:
                     return self.send(403, "{}")
                 if u.path in ("/api/upload", "/share"):
                     return self.upload(u.path == "/share")
+                if u.path == "/api/move":
+                    try:
+                        p = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+                        folder, label = server.on_main(lambda: server.app.upload_target(p.get("dest")))
+                        if label == "Unsorted":
+                            return self.send(400, json.dumps({"error": "pick Job Search, German or General"}))
+                        d = move_upload(server.inbox, int(p["id"]), folder, label)
+                        return self.send(200, json.dumps(d))
+                    except Exception as ex:
+                        return self.send(500, json.dumps({"error": str(ex)}))
                 if u.path != "/api/do":
                     return self.send(404, "{}")
                 try:

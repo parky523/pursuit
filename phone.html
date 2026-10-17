@@ -159,6 +159,11 @@ nav button.on::before { content: ""; position: absolute; top: -1px; width: 34px;
 .up .nm { font-size: 13px; word-break: break-all; } .up .mt { font: 500 10px "JB", monospace; color: var(--muted); margin-top: 2px; }
 .hint { margin-top: 14px; padding: 10px 12px; border: 1px dashed var(--line); font-size: 12px; color: var(--muted); }
 .hint b { color: var(--lime); font-weight: 600; }
+.cats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.cat { border: 1px solid var(--line); background: var(--card); padding: 12px 4px; font: 700 10px "JB", monospace; color: var(--fg);
+  display: flex; flex-direction: column; align-items: center; gap: 6px; letter-spacing: .03em; }
+.cat b { font: 700 15px "Unbounded", sans-serif; color: var(--lime); }
+.cat.on { background: var(--lime); color: var(--bg); border-color: var(--lime); } .cat.on b { color: var(--bg); }
 </style>
 </head>
 <body>
@@ -334,23 +339,41 @@ addEventListener("touchend", e => { if (y0 != null && e.changedTouches[0].client
 
 // ---- inbox: camera / files -> PC folder that Claude Code reads ----
 const IMG = n => /\.(jpe?g|png|gif|webp|heic|bmp)$/i.test(n);
+let inboxCat = "";
+const CAT_ICON = { job: "◎", german: "DE", general: "●" };
+function thumb(u) {
+  return `<div class="th">${IMG(u.name) ? `<img loading="lazy" src="/inbox-file?id=${u.id}&k=${KEY}">` : esc((u.name.split(".").pop() || "").toUpperCase())}</div>`;
+}
 function inbox() {
   $("#bar").style.width = "0%";
-  const opts = ['<option value="">Inbox · Claude reads it</option>'].concat((S.folders || []).map(f =>
-    `<option value="${esc(f.id)}"${f.id === inboxDest ? " selected" : ""}>${esc(f.label)}</option>`)).join("");
+  const cats = S.inbox_cats || [];
   let h = `<div class="pick">
     <button class="fill" data-pick="cam"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>CAMERA</button>
     <button data-pick="files"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></svg>FILES / PDF</button></div>`;
   if (queue.length) h += '<div class="queue">' + queue.map((f, i) => `<div class="qi">${f.url ? `<img src="${f.url}">` : esc(f.file.name.slice(-18))}<span class="x" data-unq="${i}">✕</span></div>`).join("") + "</div>";
+  h += `<div class="field"><label>WHERE DOES IT GO? <span style="color:var(--orange)">· REQUIRED</span></label><div class="cats">` +
+    cats.map(c => `<button class="cat${c.id === inboxCat ? " on" : ""}" data-cat="${esc(c.id)}"><b>${CAT_ICON[c.id] || "•"}</b>${esc(c.label.toUpperCase())}</button>`).join("") + "</div></div>";
+  if (inboxCat === "job" && (S.folders || []).length) {
+    const opts = ['<option value="">Job Search inbox</option>'].concat(S.folders.map(f =>
+      `<option value="${esc(f.id)}"${f.id === inboxDest ? " selected" : ""}>${esc(f.label)}</option>`)).join("");
+    h += `<div class="field"><label>INTO AN APPLICATION? (OPTIONAL)</label><select id="up-dest">${opts}</select></div>`;
+  }
   h += `<div class="field"><label>NAME IT (OPTIONAL)</label><input id="up-label" placeholder="e.g. Siemens job ad" value="${esc(inboxLabel)}"></div>
-    <div class="field"><label>NOTE FOR CLAUDE (OPTIONAL)</label><input id="up-note" placeholder="e.g. tailor my CV to this" value="${esc(inboxNote)}"></div>
-    <div class="field"><label>SAVE TO</label><select id="up-dest">${opts}</select></div>
-    <button class="send" id="up-send"${queue.length && !sending ? "" : " disabled"}>${sending ? "SENDING…" : queue.length ? `SEND ${queue.length} FILE${queue.length > 1 ? "S" : ""} TO PC` : "PICK A PHOTO OR FILE FIRST"}</button>
-    <div class="prog" id="up-prog"><i></i></div>
-    <div class="hint">Then in Claude Code just say <b>"check my inbox"</b>. Tip: in any app, <b>Share → Pursuit</b> sends straight here.</div>`;
-  h += sec("RECENT", "var(--muted)", uploads.length);
-  h += uploads.length ? uploads.map(u => `<a class="up" href="/inbox-file?id=${u.id}&k=${KEY}" target="_blank">
-      <div class="th">${IMG(u.name) ? `<img loading="lazy" src="/inbox-file?id=${u.id}&k=${KEY}">` : esc((u.name.split(".").pop() || "").toUpperCase())}</div>
+    <div class="field"><label>NOTE FOR CLAUDE (OPTIONAL)</label><input id="up-note" placeholder="e.g. tailor my CV to this" value="${esc(inboxNote)}"></div>`;
+  const ready = queue.length && inboxCat && !sending;
+  const label = sending ? "SENDING…" : !queue.length ? "PICK A PHOTO OR FILE FIRST" : !inboxCat ? "CHOOSE WHERE IT GOES" :
+    `SEND ${queue.length} FILE${queue.length > 1 ? "S" : ""} → ${esc((cats.find(c => c.id === inboxCat) || {}).label || "").toUpperCase()}`;
+  h += `<button class="send" id="up-send"${ready ? "" : " disabled"}>${label}</button><div class="prog" id="up-prog"><i></i></div>
+    <div class="hint">Then in Claude Code just say <b>"check my inbox"</b>. Tip: in any app, <b>Share → Pursuit</b> - shared items wait below until you pick where they go.</div>`;
+  const unsorted = uploads.filter(u => u.dest === "Unsorted"), done = uploads.filter(u => u.dest !== "Unsorted");
+  if (unsorted.length) {
+    h += sec("SORT THESE", "var(--orange)", unsorted.length);
+    h += unsorted.map(u => `<div class="up">${thumb(u)}<div style="flex:1;min-width:0"><div class="nm">${esc(u.name)}</div>
+      ${u.note ? `<div class="mt" style="color:var(--fg)">${esc(u.note)}</div>` : ""}
+      <div class="acts" style="margin-top:6px">${cats.map(c => `<button class="btn" data-move="${u.id}" data-to="${esc(c.id)}">${esc(c.label.toUpperCase())}</button>`).join("")}</div></div></div>`).join("");
+  }
+  h += sec("RECENT", "var(--muted)", done.length);
+  h += done.length ? done.map(u => `<a class="up" href="/inbox-file?id=${u.id}&k=${KEY}" target="_blank">${thumb(u)}
       <div><div class="nm">${esc(u.name)}</div><div class="mt">${esc(u.dest)} · ${esc(u.time.slice(5, 16).replace("T", " "))} · ${Math.max(1, Math.round(u.size / 1024))} KB</div>
       ${u.note ? `<div class="mt" style="color:var(--fg)">${esc(u.note)}</div>` : ""}</div></a>`).join("") : '<div class="empty mono">NOTHING SENT YET</div>';
   return h;
@@ -370,34 +393,45 @@ const fileIn = Object.assign(document.createElement("input"), { type: "file", mu
 }));
 function sendQueue() {
   if (offline) return toast("PC offline - can't send right now", true);
+  if (!inboxCat) return toast("Choose where it goes first", true);
   keepFields(); sending = true; render();
   const fd = new FormData();
   queue.forEach(q => fd.append("files", q.file, q.file.name));
-  fd.append("label", inboxLabel); fd.append("note", inboxNote); fd.append("dest", inboxDest);
+  const dest = inboxCat === "job" && inboxDest ? inboxDest : "cat:" + inboxCat;
+  fd.append("label", inboxLabel); fd.append("note", inboxNote); fd.append("dest", dest);
   const xhr = new XMLHttpRequest();
   xhr.open("POST", "/api/upload"); xhr.setRequestHeader("X-Key", KEY);
   xhr.upload.onprogress = e => { const p = $("#up-prog"); if (p && e.lengthComputable) { p.style.display = "block"; p.firstChild.style.width = (100 * e.loaded / e.total) + "%"; } };
   xhr.onload = () => {
     sending = false;
     if (xhr.status === 200) {
-      const n = JSON.parse(xhr.responseText).saved.length;
-      queue.forEach(q => q.url && URL.revokeObjectURL(q.url)); queue = []; inboxLabel = inboxNote = "";
-      toast(`Sent ${n} file${n > 1 ? "s" : ""} to PC`); loadUploads();
+      const s = JSON.parse(xhr.responseText).saved;
+      queue.forEach(q => q.url && URL.revokeObjectURL(q.url)); queue = []; inboxLabel = inboxNote = ""; inboxCat = ""; inboxDest = "";
+      toast(`Sent ${s.length} → ${s[0].dest}`); loadUploads();
     } else { let m = "Upload failed"; try { m = JSON.parse(xhr.responseText).error || m; } catch (e) {} toast(m, true); }
     render();
   };
   xhr.onerror = () => { sending = false; toast("Upload failed - is the PC online?", true); render(); };
   xhr.send(fd);
 }
+async function moveUpload(id, cat) {
+  try {
+    const r = await fetch("/api/move", { method: "POST", headers: { "X-Key": KEY, "Content-Type": "application/json" }, body: JSON.stringify({ id, dest: "cat:" + cat }) });
+    const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+    toast("Moved → " + j.dest); loadUploads();
+  } catch (e) { toast(String(e.message || e), true); }
+}
 document.addEventListener("click", e => {
-  const b = e.target.closest("[data-pick],[data-unq],#up-send");
+  const b = e.target.closest("[data-pick],[data-unq],[data-cat],[data-move],#up-send");
   if (!b) return;
   if (b.dataset.pick) { keepFields(); (b.dataset.pick === "cam" ? camIn : fileIn).click(); }
   else if (b.dataset.unq) { keepFields(); const q = queue.splice(Number(b.dataset.unq), 1)[0]; if (q && q.url) URL.revokeObjectURL(q.url); render(); }
+  else if (b.dataset.cat) { keepFields(); inboxCat = b.dataset.cat; if (inboxCat !== "job") inboxDest = ""; render(); }
+  else if (b.dataset.move) moveUpload(Number(b.dataset.move), b.dataset.to);
   else if (b.id === "up-send" && !b.disabled) sendQueue();
 });
 document.addEventListener("change", e => { if (e.target.id === "up-dest") inboxDest = e.target.value; });
-if (SHARED) { setTimeout(() => toast(`Shared ${SHARED} item${SHARED > 1 ? "s" : ""} to PC inbox`), 300); history.replaceState(null, "", "/?k=" + KEY + "#inbox"); }
+if (SHARED) { setTimeout(() => toast(`Shared ${SHARED} item${SHARED > 1 ? "s" : ""} - pick where below`), 300); history.replaceState(null, "", "/?k=" + KEY + "#inbox"); }
 loadUploads();
 
 load();

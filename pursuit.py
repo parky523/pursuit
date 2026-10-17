@@ -40,6 +40,11 @@ CONFIG_DEFAULTS = {
     "tracker": "Job_Search_Tracker.xlsx",        # path to the workbook (relative = next to this file)
     "applications_dir": "Applications",          # folder with YYYY-MM\YYYY-MM-DD_Company_Role subfolders
     "inbox_dir": "Inbox",                        # phone uploads (camera / files / share-to-Pursuit) land here
+    "inbox_categories": [                        # the phone asks which one before sending; subfolders of inbox_dir
+        {"id": "job", "label": "Job Search", "dir": "Job_Search"},
+        {"id": "german", "label": "German Learning", "dir": "German_Learning"},
+        {"id": "general", "label": "General", "dir": "General"},
+    ],
     "weekly_target": 5,
     "follow_up_days": 14,
     "deadline": None,                            # optional {"label", "date": "YYYY-MM-DD", "note"} Coach tile
@@ -77,6 +82,7 @@ CFG = load_config()
 TRACKER = cfg_path(CFG["tracker"])
 APPS_DIR = cfg_path(CFG["applications_dir"])
 INBOX_DIR = cfg_path(CFG["inbox_dir"])
+INBOX_CATS = CFG["inbox_categories"]
 SHEETS = CFG["sheets"]
 DEFAULT_ITEMS = list(CFG["daily_items"])
 STATUSES = ["Researching", "Drafted", "Applied", "Interview", "Offer", "Rejected", "No reply", "Skipped - Not a Fit"]
@@ -1015,6 +1021,7 @@ class Checklist:
             "synced": self.loaded_at.strftime("%H:%M") if getattr(self, "loaded_at", None) else None,
             "folders": [{"id": f"app:{a['row']}:{a['company']}", "label": f"{a['company']} · {a['role']}"[:70]}
                         for a, _ in self.app_folders()],
+            "inbox_cats": [{"id": c["id"], "label": c["label"]} for c in INBOX_CATS],
         }
 
     # ---- phone inbox ----
@@ -1033,13 +1040,19 @@ class Checklist:
         return self._folders
 
     def upload_target(self, dest):
-        """Phone 'dest' id -> (folder, label). Application uploads go into <folder>\\Attachments."""
+        """Phone 'dest' id -> (folder, label).
+        cat:<id> -> Inbox\\<category dir>; app:<row>:<company> -> <application folder>\\Attachments;
+        anything else (Android share, which can't ask first) -> Inbox\\_Unsorted until sorted on the phone."""
+        if dest and dest.startswith("cat:"):
+            for c in INBOX_CATS:
+                if c["id"] == dest[4:]:
+                    return INBOX_DIR / c["dir"], c["label"]
         if dest and dest.startswith("app:"):
             _, row, company = dest.split(":", 2)
             for a, f in self.app_folders():
                 if str(a["row"]) == row and a["company"] == company:
-                    return f / "Attachments", a["company"]
-        return INBOX_DIR, "Inbox"
+                    return f / "Attachments", f"Job Search · {a['company']}"
+        return INBOX_DIR / "_Unsorted", "Unsorted"
 
     def notify_upload(self, n, label):
         msg = f"📥 {n} file{'s' if n != 1 else ''} from phone → {label}"

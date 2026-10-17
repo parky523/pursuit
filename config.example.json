@@ -4,6 +4,12 @@
   "tracker": "Job_Search_Tracker.xlsx",
   "applications_dir": "Applications",
   "inbox_dir": "Inbox",
+  "_inbox_help": "Phone INBOX tab asks which of these before sending; each is a subfolder of inbox_dir.",
+  "inbox_categories": [
+    {"id": "job", "label": "Job Search", "dir": "Job_Search"},
+    {"id": "german", "label": "Language Learning", "dir": "Language_Learning"},
+    {"id": "general", "label": "General", "dir": "General"}
+  ],
 
   "weekly_target": 5,
   "follow_up_days": 14,
