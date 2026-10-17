@@ -39,6 +39,7 @@ CONFIG_FILE = BASE / "config.json"
 CONFIG_DEFAULTS = {
     "tracker": "Job_Search_Tracker.xlsx",        # path to the workbook (relative = next to this file)
     "applications_dir": "Applications",          # folder with YYYY-MM\YYYY-MM-DD_Company_Role subfolders
+    "inbox_dir": "Inbox",                        # phone uploads (camera / files / share-to-Pursuit) land here
     "weekly_target": 5,
     "follow_up_days": 14,
     "deadline": None,                            # optional {"label", "date": "YYYY-MM-DD", "note"} Coach tile
@@ -75,6 +76,7 @@ def cfg_path(p):
 CFG = load_config()
 TRACKER = cfg_path(CFG["tracker"])
 APPS_DIR = cfg_path(CFG["applications_dir"])
+INBOX_DIR = cfg_path(CFG["inbox_dir"])
 SHEETS = CFG["sheets"]
 DEFAULT_ITEMS = list(CFG["daily_items"])
 STATUSES = ["Researching", "Drafted", "Applied", "Interview", "Offer", "Rejected", "No reply", "Skipped - Not a Fit"]
@@ -432,7 +434,8 @@ class Checklist:
         self.info = tk.Frame(self.footer, bg=BG)
         self.status_lbl = tk.Label(self.info, bg=BG, fg=MUTED, font=(MONO, 8), anchor="w")
         self.status_lbl.pack(side="left")
-        for text, cmd in (("OPEN XLSX ↗", lambda: os.startfile(TRACKER)), ("SYNC ↻", self.force_reload)):
+        for text, cmd in (("OPEN XLSX ↗", lambda: os.startfile(TRACKER)), ("INBOX ↗", self.open_inbox),
+                          ("SYNC ↻", self.force_reload)):
             b = tk.Label(self.info, text=text, bg=BG, fg=LIME, font=(MONO_B, 8, "bold"), cursor="hand2", padx=6)
             b.pack(side="right")
             b.bind("<Button-1>", lambda e, c=cmd: c())
@@ -457,7 +460,7 @@ class Checklist:
         self.calls = queue.Queue()
         self.pump()
         from phone_server import PhoneServer
-        self.phone = PhoneServer(self, BASE)
+        self.phone = PhoneServer(self, BASE, INBOX_DIR)
         save_state(self.s)  # persists the phone key on first run
         if not self.phone.start():
             self.err = self.phone.error
@@ -1010,7 +1013,43 @@ class Checklist:
                                      "next": [{"prio": x["prio"], "company": x["company"]} for x in not_started[:3]]}},
             "busy": bool(getattr(self, "busy", False)), "msg": self.err,
             "synced": self.loaded_at.strftime("%H:%M") if getattr(self, "loaded_at", None) else None,
+            "folders": [{"id": f"app:{a['row']}:{a['company']}", "label": f"{a['company']} · {a['role']}"[:70]}
+                        for a, _ in self.app_folders()],
         }
+
+    # ---- phone inbox ----
+    def app_folders(self):
+        """[(app, folder)] for open applications that have an Applications\\... folder (cached per tracker load)."""
+        if getattr(self, "_folders_mtime", None) != self.mtime:
+            self._folders_mtime = self.mtime
+            out = []
+            for key in ("hot", "due", "applied", "drafted", "research"):
+                for a in self.groups[key]:
+                    f = find_folder(a)
+                    if f:
+                        out.append((a, f))
+            out.sort(key=lambda x: x[0]["date"] or dt.date.min, reverse=True)
+            self._folders = out
+        return self._folders
+
+    def upload_target(self, dest):
+        """Phone 'dest' id -> (folder, label). Application uploads go into <folder>\\Attachments."""
+        if dest and dest.startswith("app:"):
+            _, row, company = dest.split(":", 2)
+            for a, f in self.app_folders():
+                if str(a["row"]) == row and a["company"] == company:
+                    return f / "Attachments", a["company"]
+        return INBOX_DIR, "Inbox"
+
+    def notify_upload(self, n, label):
+        msg = f"📥 {n} file{'s' if n != 1 else ''} from phone → {label}"
+        self.err = msg
+        self.render()
+        self.root.after(10000, lambda: self.err == msg and (setattr(self, "err", ""), self.render()))
+
+    def open_inbox(self):
+        INBOX_DIR.mkdir(parents=True, exist_ok=True)
+        os.startfile(INBOX_DIR)
 
     def phone_do(self, p):
         """One action from the phone. Items are matched by text, so a stale phone view can't hit the wrong row."""

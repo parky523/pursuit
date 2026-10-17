@@ -112,7 +112,7 @@ main { padding: 0 16px calc(var(--bot) + 150px); }
 .toggle-closed { width: 100%; text-align: left; }
 
 /* bottom nav */
-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: repeat(3, 1fr);
+nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: repeat(4, 1fr);
   background: var(--bg); border-top: 1px solid var(--line); padding-bottom: var(--bot); }
 nav button { position: relative; height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
   font: 700 10px "JB", monospace; color: var(--muted); letter-spacing: .06em; }
@@ -132,6 +132,33 @@ nav button.on::before { content: ""; position: absolute; top: -1px; width: 34px;
   font: 700 12px "JB", monospace; padding: 12px; opacity: 0; transition: opacity .2s; pointer-events: none; }
 .toast.show { opacity: 1; } .toast.err { background: var(--red); }
 .empty { color: var(--dim); padding: 30px 0; text-align: center; }
+
+/* inbox */
+.pick { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+.pick button { height: 104px; border: 1px solid var(--line); background: var(--card); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px; font: 700 12px "JB", monospace; color: var(--lime); letter-spacing: .05em; }
+.pick button.fill { background: var(--lime); color: var(--bg); border-color: var(--lime); }
+.pick svg { width: 30px; height: 30px; stroke: currentColor; fill: none; stroke-width: 2; }
+.field { margin-top: 10px; }
+.field label { display: block; font: 700 10px "JB", monospace; color: var(--muted); letter-spacing: .06em; margin-bottom: 5px; }
+.field input, .field select { width: 100%; background: var(--card); border: 1px solid var(--line); color: var(--fg);
+  font: 400 16px "IS", sans-serif; padding: 11px; border-radius: 0; outline: none; -webkit-appearance: none; }
+.field input:focus, .field select:focus { border-color: var(--lime); }
+.queue { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 12px; }
+.qi { position: relative; aspect-ratio: 1; background: var(--card); border: 1px solid var(--line); overflow: hidden;
+  display: grid; place-items: center; font: 700 10px "JB", monospace; color: var(--muted); text-align: center; padding: 4px; word-break: break-all; }
+.qi img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.qi .x { position: absolute; top: 0; right: 0; background: var(--bg); color: var(--red); padding: 3px 6px; font: 700 11px "JB", monospace; z-index: 1; }
+.send { width: 100%; margin-top: 12px; background: var(--lime); color: var(--bg); font: 700 13px "JB", monospace; padding: 15px; letter-spacing: .05em; }
+.send:disabled { background: var(--line); color: var(--dim); }
+.prog { height: 4px; background: var(--line); margin-top: 8px; display: none; } .prog i { display: block; height: 4px; width: 0; background: var(--lime); }
+.up { display: flex; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); color: inherit; text-decoration: none; }
+.up .th { width: 48px; height: 48px; flex: none; background: var(--card); border: 1px solid var(--line); display: grid; place-items: center;
+  font: 700 9px "JB", monospace; color: var(--muted); overflow: hidden; }
+.up .th img { width: 100%; height: 100%; object-fit: cover; }
+.up .nm { font-size: 13px; word-break: break-all; } .up .mt { font: 500 10px "JB", monospace; color: var(--muted); margin-top: 2px; }
+.hint { margin-top: 14px; padding: 10px 12px; border: 1px dashed var(--line); font-size: 12px; color: var(--muted); }
+.hint b { color: var(--lime); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -147,6 +174,7 @@ nav button.on::before { content: ""; position: absolute; top: -1px; width: 34px;
   <button data-tab="today"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18"/><path d="M7.5 12.5l3 3 6-7"/></svg>TODAY</button>
   <button data-tab="coach"><svg viewBox="0 0 24 24"><circle cx="11" cy="13" r="8"/><circle cx="11" cy="13" r="3.5"/><path d="M13.5 10.5L21 3M16 3h5v5"/></svg>COACH</button>
   <button data-tab="apps"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h12"/></svg>PIPELINE</button>
+  <button data-tab="inbox"><svg viewBox="0 0 24 24"><path d="M3 13h5l1.5 3h5L16 13h5"/><path d="M5 5h14l2 8v6H3v-6z"/></svg>INBOX</button>
 </nav>
 <div class="sheet-bg" id="sheetbg"></div>
 <div class="sheet" id="sheet"></div>
@@ -158,7 +186,9 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let S = null, tab = "today", offline = false, showClosed = false, pollTimer = null;
 try { tab = localStorage.getItem("pursuit.tab") || "today"; } catch (e) {}
-if (["#today", "#coach", "#apps"].includes(location.hash)) tab = location.hash.slice(1);
+if (["#today", "#coach", "#apps", "#inbox"].includes(location.hash)) tab = location.hash.slice(1);
+const SHARED = Number(new URLSearchParams(location.search).get("shared") || 0);
+let queue = [], uploads = [], sending = false, inboxDest = "", inboxLabel = "", inboxNote = "";
 
 async function api(path, body) {
   const r = await fetch(path, { method: body ? "POST" : "GET", cache: "no-store",
@@ -197,6 +227,7 @@ function render() {
   let h = "";
   if (offline) h += `<div class="banner off mono">PC OFFLINE · SHOWING LAST VIEW${S._at ? " FROM " + new Date(S._at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : ""}<br><span style="color:var(--muted)">Check: Tailscale switched ON on this phone · PC awake · Pursuit open on the PC</span></div>`;
   else if (S.msg) h += `<div class="banner mono">${esc(S.msg.toUpperCase())}</div>`;
+  if (tab === "inbox") { $("#main").innerHTML = h + inbox(); return; }
   h += tab === "today" ? today() : tab === "coach" ? coach() : pipeline();
   $("#main").innerHTML = h;
 }
@@ -300,6 +331,74 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) load
 let y0 = null;
 addEventListener("touchstart", e => { y0 = scrollY <= 0 ? e.touches[0].clientY : null; }, { passive: true });
 addEventListener("touchend", e => { if (y0 != null && e.changedTouches[0].clientY - y0 > 90) { toast("Syncing"); act({ action: "sync" }); } y0 = null; }, { passive: true });
+
+// ---- inbox: camera / files -> PC folder that Claude Code reads ----
+const IMG = n => /\.(jpe?g|png|gif|webp|heic|bmp)$/i.test(n);
+function inbox() {
+  $("#bar").style.width = "0%";
+  const opts = ['<option value="">Inbox · Claude reads it</option>'].concat((S.folders || []).map(f =>
+    `<option value="${esc(f.id)}"${f.id === inboxDest ? " selected" : ""}>${esc(f.label)}</option>`)).join("");
+  let h = `<div class="pick">
+    <button class="fill" data-pick="cam"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>CAMERA</button>
+    <button data-pick="files"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></svg>FILES / PDF</button></div>`;
+  if (queue.length) h += '<div class="queue">' + queue.map((f, i) => `<div class="qi">${f.url ? `<img src="${f.url}">` : esc(f.file.name.slice(-18))}<span class="x" data-unq="${i}">✕</span></div>`).join("") + "</div>";
+  h += `<div class="field"><label>NAME IT (OPTIONAL)</label><input id="up-label" placeholder="e.g. Siemens job ad" value="${esc(inboxLabel)}"></div>
+    <div class="field"><label>NOTE FOR CLAUDE (OPTIONAL)</label><input id="up-note" placeholder="e.g. tailor my CV to this" value="${esc(inboxNote)}"></div>
+    <div class="field"><label>SAVE TO</label><select id="up-dest">${opts}</select></div>
+    <button class="send" id="up-send"${queue.length && !sending ? "" : " disabled"}>${sending ? "SENDING…" : queue.length ? `SEND ${queue.length} FILE${queue.length > 1 ? "S" : ""} TO PC` : "PICK A PHOTO OR FILE FIRST"}</button>
+    <div class="prog" id="up-prog"><i></i></div>
+    <div class="hint">Then in Claude Code just say <b>"check my inbox"</b>. Tip: in any app, <b>Share → Pursuit</b> sends straight here.</div>`;
+  h += sec("RECENT", "var(--muted)", uploads.length);
+  h += uploads.length ? uploads.map(u => `<a class="up" href="/inbox-file?id=${u.id}&k=${KEY}" target="_blank">
+      <div class="th">${IMG(u.name) ? `<img loading="lazy" src="/inbox-file?id=${u.id}&k=${KEY}">` : esc((u.name.split(".").pop() || "").toUpperCase())}</div>
+      <div><div class="nm">${esc(u.name)}</div><div class="mt">${esc(u.dest)} · ${esc(u.time.slice(5, 16).replace("T", " "))} · ${Math.max(1, Math.round(u.size / 1024))} KB</div>
+      ${u.note ? `<div class="mt" style="color:var(--fg)">${esc(u.note)}</div>` : ""}</div></a>`).join("") : '<div class="empty mono">NOTHING SENT YET</div>';
+  return h;
+}
+async function loadUploads() { try { uploads = await api("/api/inbox"); if (tab === "inbox") render(); } catch (e) {} }
+function keepFields() {
+  const l = $("#up-label"), n = $("#up-note"), d = $("#up-dest");
+  if (l) inboxLabel = l.value; if (n) inboxNote = n.value; if (d) inboxDest = d.value;
+}
+const camIn = Object.assign(document.createElement("input"), { type: "file", accept: "image/*" });
+camIn.setAttribute("capture", "environment");
+const fileIn = Object.assign(document.createElement("input"), { type: "file", multiple: true });
+[camIn, fileIn].forEach(inp => inp.addEventListener("change", () => {
+  keepFields();
+  for (const f of inp.files) queue.push({ file: f, url: f.type.startsWith("image/") ? URL.createObjectURL(f) : null });
+  inp.value = ""; render();
+}));
+function sendQueue() {
+  if (offline) return toast("PC offline - can't send right now", true);
+  keepFields(); sending = true; render();
+  const fd = new FormData();
+  queue.forEach(q => fd.append("files", q.file, q.file.name));
+  fd.append("label", inboxLabel); fd.append("note", inboxNote); fd.append("dest", inboxDest);
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/upload"); xhr.setRequestHeader("X-Key", KEY);
+  xhr.upload.onprogress = e => { const p = $("#up-prog"); if (p && e.lengthComputable) { p.style.display = "block"; p.firstChild.style.width = (100 * e.loaded / e.total) + "%"; } };
+  xhr.onload = () => {
+    sending = false;
+    if (xhr.status === 200) {
+      const n = JSON.parse(xhr.responseText).saved.length;
+      queue.forEach(q => q.url && URL.revokeObjectURL(q.url)); queue = []; inboxLabel = inboxNote = "";
+      toast(`Sent ${n} file${n > 1 ? "s" : ""} to PC`); loadUploads();
+    } else { let m = "Upload failed"; try { m = JSON.parse(xhr.responseText).error || m; } catch (e) {} toast(m, true); }
+    render();
+  };
+  xhr.onerror = () => { sending = false; toast("Upload failed - is the PC online?", true); render(); };
+  xhr.send(fd);
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-pick],[data-unq],#up-send");
+  if (!b) return;
+  if (b.dataset.pick) { keepFields(); (b.dataset.pick === "cam" ? camIn : fileIn).click(); }
+  else if (b.dataset.unq) { keepFields(); const q = queue.splice(Number(b.dataset.unq), 1)[0]; if (q && q.url) URL.revokeObjectURL(q.url); render(); }
+  else if (b.id === "up-send" && !b.disabled) sendQueue();
+});
+document.addEventListener("change", e => { if (e.target.id === "up-dest") inboxDest = e.target.value; });
+if (SHARED) { setTimeout(() => toast(`Shared ${SHARED} item${SHARED > 1 ? "s" : ""} to PC inbox`), 300); history.replaceState(null, "", "/?k=" + KEY + "#inbox"); }
+loadUploads();
 
 load();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});

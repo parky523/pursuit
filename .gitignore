@@ -7,6 +7,7 @@ removed_rows.json
 !Job_Search_Tracker_TEMPLATE.xlsx
 ~$*.xlsx
 Applications/
+Inbox/
 *QR*.png
 
 # build output (Pursuit.exe is attached to GitHub Releases instead)

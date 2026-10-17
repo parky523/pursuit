@@ -35,9 +35,79 @@ def local_ips():
     return (lan[0] if lan else None), (ts[0] if ts else None)
 
 
+MAX_UPLOAD = 200 * 1024 * 1024  # per request
+
+
+def parse_multipart(ctype, body):
+    """multipart/form-data -> ({field: str}, [(filename, bytes)]). Uses email, since cgi is gone in 3.13."""
+    from email.parser import BytesParser
+    from email.policy import HTTP
+    msg = BytesParser(policy=HTTP).parsebytes(b"Content-Type: " + ctype.encode() + b"\r\n\r\n" + body)
+    fields, files = {}, []
+    for part in msg.iter_parts():
+        name = part.get_param("name", header="content-disposition")
+        data = part.get_payload(decode=True) or b""
+        if part.get_filename():
+            if data:
+                files.append((part.get_filename(), data))
+        elif name:
+            fields[name] = data.decode("utf-8", "replace")
+    return fields, files
+
+
+def safe_name(name, limit=60):
+    import re
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("._")
+    return stem[:limit] or "file"
+
+
+def save_uploads(folder, files, label, note, log_dir, dest_label):
+    """Write files as YYYY-MM-DD_HHMMSS_<label|original>.<ext> and log each one to <inbox>/_uploads.jsonl."""
+    import datetime as dt
+    from pathlib import Path
+    folder.mkdir(parents=True, exist_ok=True)
+    log_dir.mkdir(parents=True, exist_ok=True)
+    stamp = dt.datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    saved = []
+    for i, (orig, data) in enumerate(files, 1):
+        p = Path(orig)
+        ext = p.suffix.lower() or (mimetypes.guess_extension("application/octet-stream") or "")
+        base = safe_name(label) if label else safe_name(p.stem)
+        if label and len(files) > 1:
+            base += f"_{i}"
+        target = folder / f"{stamp}_{base}{ext}"
+        n = 2
+        while target.exists():
+            target = folder / f"{stamp}_{base}_{n}{ext}"
+            n += 1
+        target.write_bytes(data)
+        saved.append({"name": target.name, "path": str(target), "size": len(data), "dest": dest_label,
+                      "note": note, "time": dt.datetime.now().isoformat(timespec="seconds")})
+    with open(log_dir / "_uploads.jsonl", "a", encoding="utf-8") as f:
+        for s in saved:
+            f.write(json.dumps(s, ensure_ascii=False) + "\n")
+    return saved
+
+
+def recent_uploads(log_dir, limit=30):
+    try:
+        lines = (log_dir / "_uploads.jsonl").read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    out = []
+    for i, line in enumerate(lines):
+        try:
+            d = json.loads(line)
+            d["id"] = i
+            out.append(d)
+        except ValueError:
+            pass
+    return out[-limit:][::-1]
+
+
 class PhoneServer:
-    def __init__(self, app, base):
-        self.app, self.base = app, base
+    def __init__(self, app, base, inbox):
+        self.app, self.base, self.inbox = app, base, inbox
         if not app.s.get("token"):
             app.s["token"] = secrets.token_urlsafe(9)
         self.token = app.s["token"]
@@ -106,7 +176,25 @@ class PhoneServer:
                         "icons": [{"src": "/icon-192.png", "sizes": "192x192", "type": "image/png",
                                    "purpose": "any maskable"},
                                   {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png",
-                                   "purpose": "any maskable"}]}), "application/manifest+json")
+                                   "purpose": "any maskable"}],
+                        # Android "Share -> Pursuit" from gallery, WhatsApp, Chrome, files...
+                        "share_target": {"action": f"/share?k={server.token}", "method": "POST",
+                                         "enctype": "multipart/form-data",
+                                         "params": {"title": "title", "text": "text", "url": "url",
+                                                    "files": [{"name": "files",
+                                                               "accept": ["image/*", "application/pdf", "*/*"]}]}},
+                    }), "application/manifest+json")
+                if u.path == "/api/inbox":
+                    return self.send(200, json.dumps(recent_uploads(server.inbox)))
+                if u.path == "/inbox-file":
+                    try:  # only files that were logged as uploads can be fetched
+                        item = next(x for x in recent_uploads(server.inbox, 10**6) if x["id"] == int(q["id"][0]))
+                        from pathlib import Path
+                        f = Path(item["path"])
+                        ctype = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
+                        return self.send(200, f.read_bytes(), ctype, cache=True)
+                    except Exception:
+                        return self.send(404, "{}")
                 if u.path == "/api/state":
                     try:
                         return self.send(200, json.dumps(server.on_main(server.app.state_json), default=str))
@@ -118,6 +206,8 @@ class PhoneServer:
                 u = urlparse(self.path)
                 if not self.authed(parse_qs(u.query)):
                     return self.send(403, "{}")
+                if u.path in ("/api/upload", "/share"):
+                    return self.upload(u.path == "/share")
                 if u.path != "/api/do":
                     return self.send(404, "{}")
                 try:
@@ -125,6 +215,33 @@ class PhoneServer:
                     payload = json.loads(self.rfile.read(n) or b"{}")
                     out = server.on_main(lambda: server.app.phone_do(payload))
                     self.send(200, json.dumps(out, default=str))
+                except Exception as ex:
+                    self.send(500, json.dumps({"error": str(ex)}))
+
+            def upload(self, shared):
+                """Camera/file upload from the Inbox tab, or Android share-to-Pursuit."""
+                try:
+                    n = int(self.headers.get("Content-Length") or 0)
+                    if n > MAX_UPLOAD:
+                        return self.send(413, json.dumps({"error": "too big (max 200 MB per send)"}))
+                    fields, files = parse_multipart(self.headers.get("Content-Type", ""), self.rfile.read(n))
+                    note = fields.get("note", "").strip()
+                    if shared:  # shared links/text arrive as fields, not files
+                        text = "\n".join(x for x in (fields.get("title"), fields.get("text"), fields.get("url")) if x)
+                        note = note or text[:300]
+                        if text and not files:
+                            files = [("shared_link.md", text.encode("utf-8"))]
+                    if not files:
+                        return self.send(400, json.dumps({"error": "no file received"}))
+                    folder, label = server.on_main(lambda: server.app.upload_target(fields.get("dest")))
+                    saved = save_uploads(folder, files, fields.get("label", "").strip(), note, server.inbox, label)
+                    server.on_main(lambda: server.app.notify_upload(len(saved), label))
+                    if shared:  # back into the app, on the Inbox tab
+                        self.send_response(303)
+                        self.send_header("Location", f"/?k={server.token}&shared={len(saved)}#inbox")
+                        self.end_headers()
+                        return
+                    self.send(200, json.dumps({"saved": saved}))
                 except Exception as ex:
                     self.send(500, json.dumps({"error": str(ex)}))
 

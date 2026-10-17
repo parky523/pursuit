@@ -23,6 +23,8 @@ Pursuit.exe / pursuit.py        Tk main thread: UI, state, all logic
         GET  /?k=TOKEN           phone.html (TOKEN substituted)
         GET  /api/state          app.state_json()      ┐ executed on the Tk thread via
         POST /api/do  {action}   app.phone_do(payload) ┘ app.calls queue + pump()
+        POST /api/upload, /share  phone Inbox tab + Android share_target -> inbox_dir or <app>\Attachments
+        GET  /api/inbox, /inbox-file?id=  recent uploads (log: <inbox_dir>/_uploads.jsonl)
         GET  /manifest.webmanifest, /sw.js, /icon-*.png, /fonts/*.ttf
         auth: ?k= or X-Key header == checklist.json "token" (static icons/fonts/sw.js are public)
 ```
@@ -54,6 +56,10 @@ Phone over the internet = Tailscale. `tailscale serve --bg 8787` gives `https://
 - **Weekly target / follow-up interval / deadline tile:** `config.json`.
 - **Colours / fonts:** constants at the top of `pursuit.py` (`BG, CARD, LINE, FG, MUTED, DIM, LIME, ORANGE, RED, SKY`) and the `:root` CSS variables in `phone.html`. Keep both in sync.
 - **Port:** `PORT` in `phone_server.py` (also update the firewall rule in `setup.ps1`).
+
+## Phone Inbox
+
+When the user says "check my inbox": read the newest lines of `<inbox_dir>/_uploads.jsonl` (name, path, dest, note, time), open those files, do what the note says, then file them where they belong. Don't edit the jsonl log.
 
 ## Debugging checklist
 

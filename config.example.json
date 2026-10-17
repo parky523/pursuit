@@ -3,6 +3,7 @@
 
   "tracker": "Job_Search_Tracker.xlsx",
   "applications_dir": "Applications",
+  "inbox_dir": "Inbox",
 
   "weekly_target": 5,
   "follow_up_days": 14,
